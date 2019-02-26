@@ -1,0 +1,222 @@
+#include <iostream>
+#include <fstream>
+#include <windows.h>
+#include <string>
+
+Method of large particles by Davydov
+
+using namespace std;
+const int a=502,b=302,bx=350,by=225;
+float u[a][b],v[a][b],ro[a][b],en[a][b],pres[a][b],tmp[a][b],ro1[a][b],u1[a][b],v1[a][b],en1[a][b],temp[a][b];
+float ro0=1.225,dx=0.005,dy=0.005,dt=0.000001,temp0=300.0,p0=101325.0,u0=340.0,en0=300000;
+int i,j,ch=0,sh=0;
+float one[a][b];
+
+void vivod() //write to files
+{
+    char buffer[33]="",buf[33]="";
+    itoa(sh,buf,10);
+    strcpy(buffer,"");strcat(buffer,"data/u/u");strcat(buffer,buf);strcat(buffer,".txt");
+    ofstream txtu(buffer);
+    strcpy(buffer,"");strcat(buffer,"data/v/v");strcat(buffer,buf);strcat(buffer,".txt");
+    ofstream txtv(buffer);
+    strcpy(buffer,"");strcat(buffer,"data/pres/pres");strcat(buffer,buf);strcat(buffer,".txt");
+    ofstream txtpres(buffer);
+    strcpy(buffer,"");strcat(buffer,"data/ro/ro");strcat(buffer,buf);strcat(buffer,".txt");
+    ofstream txtro(buffer);
+    strcpy(buffer,"");strcat(buffer,"data/energy/energy");strcat(buffer,buf);strcat(buffer,".txt");
+    ofstream txten(buffer);
+    strcpy(buffer,"");strcat(buffer,"data/temp/temp");strcat(buffer,buf);strcat(buffer,".txt");
+    ofstream txttemp(buffer);
+    for (int q=0;q<b;q++)
+       {
+       for (int w=0;w<a;w++)
+            {
+        txtu<<u[w][q]<<" ";
+        txtv<<v[w][q]<<" ";
+        txten<<en[w][q]<<" ";
+        txtpres<<pres[w][q]<<" ";
+        txtro<<ro[w][q]<<" ";
+        txttemp<<temp[w][q]<<" ";
+            }
+            txtu <<endl;
+            txtv <<endl;
+            txten<<endl;
+            txtpres<<endl;
+            txtro<<endl;
+            txttemp<<endl;
+       }
+    sh+=1;
+}
+
+float half(float ar1[a][b], float arU[a][b], int q, int w, int q1, int w1)// Lagrange step
+{
+    float ret;
+    if((arU[q][w]+arU[q1][w1])>=0)
+        ret=ro[q][w]*ar1[q][w]*(arU[q][w]+arU[q1][w1])*0.5;
+    else
+        ret=ro[q1][w1]*ar1[q1][w1]*(arU[q][w]+arU[q1][w1])*0.5;
+    return ret;
+}
+
+int main()
+{
+    for(i=0;i<a;i++)
+        for(j=0;j<b;j++)
+            one[i][j]=1;
+    
+    CreateDirectory("data",NULL);
+    CreateDirectory("data/u",NULL);CreateDirectory("data/v",NULL);CreateDirectory("data/pres",NULL);
+    CreateDirectory("data/ro",NULL);CreateDirectory("data/energy",NULL);CreateDirectory("data/temp",NULL);
+
+    //nondimensionalization
+    ro0=1.225/ro0;
+    u0/=340.0;
+    p0=p0/(1.225*340*340);
+    en0=2.5*p0/ro0;
+    dt*=340;
+
+    for(j=1;j<b-1;j++)
+    {// initial wave params
+        u[0][j]=3*u0;
+        v[0][j]=0;
+        en[0][j]=en0+u[0][j]*u[0][j]*0.5;
+        ro[0][j]=1.05*ro0;
+        pres[0][j]=0.4*ro[0][j]*en[0][j];
+        temp[0][j]=pres[0][j]/ro[0][j];
+
+        pres[0][0]=50;
+        u[0][0]=3.5;
+        v[0][0]=0.1;
+        en[0][0]=10;
+        temp[0][0]=3;
+    }
+
+    // main gas initial params
+    for(i=1;i<a-1;i++)
+        {for (j=1;j<b-1;j++)
+            {
+            u[i][j]=0;  v[i][j]=0;
+            if((i<=bx)||(j<=by))
+                {en[i][j]=en0;
+                ro[i][j]=ro0;
+                pres[i][j]=0.4*ro[i][j]*en[i][j];
+                temp[i][j]=pres[i][j]/ro[i][j]; //
+                }
+            else
+                {ro[i][j]=0;    en[i][j]=0; pres[i][j]=0; temp[i][j]=0;
+                }
+
+            }
+        }
+cout<<sh<<" ";
+vivod();ch+=1;
+float time=0.0;
+while(time <=500*dt)
+{
+    //border
+for (int q=1;q<a-1;q++)//up
+{
+    u[q][0]=u[q][1];    v[q][0]=v[q][1];    pres[q][0]=pres[q][1]; ro[q][0]=ro[q][1];
+}
+for (int q=1;q<=bx;q++) //down, main
+{
+    u[q][b-1]=u[q][b-2];    v[q][b-1]=-v[q][b-2];    pres[q][b-1]=pres[q][b-2]; ro[q][b-1]=ro[q][b-2];
+}
+for (int q=bx+1;q<a-1;q++)//down, stair
+{
+    u[q][by+1]=u[q][by];    v[q][by+1]=-v[q][by];    pres[q][by+1]=pres[q][by]; ro[q][by+1]=ro[q][by];
+}
+for(int w=1;w<=by;w++)//right, main
+{
+    u[a-1][w]=u[a-2][w];    v[a-1][w]=v[a-2][w];    pres[a-1][w]=pres[a-2][w]; ro[a-1][w]=ro[a-2][w];
+}
+for(int w=by+1;w<b-1;w++)//right, stair
+{
+    u[bx+1][w]=-u[bx][w];    v[bx+1][w]=v[bx][w];    pres[bx+1][w]=pres[bx][w]; ro[bx+1][w]=ro[bx][w];
+}
+    //Eiler step
+    for(i=1;i<a-1;i++)
+        {
+            for(j=1;j<b-1;j++)
+            {
+                if((i<=bx)||(j<=by))
+                {
+                en[i][j]=en[i][j]-((0.25*(pres[i][j]+pres[i+1][j])*(u[i][j]+u[i+1][j])-0.25*(pres[i][j]+pres[i-1][j])*(u[i][j]+u[i-1][j]))/dx+
+        (0.25*(pres[i][j]+pres[i][j+1])*(v[i][j]+v[i][j+1])-0.25*(pres[i][j]+pres[i][j-1])*(v[i][j]+v[i][j-1]))/dy)*dt/ro[i][j];
+                u1[i][j]=u[i][j]-(0.5*(pres[i+1][j]+pres[i][j])-0.5*(pres[i][j]+pres[i-1][j]))/dx*dt/ro[i][j];
+				v1[i][j]=v[i][j]-(0.5*(pres[i][j+1]+pres[i][j])-0.5*(pres[i][j]+pres[i][j-1]))/dy*dt/ro[i][j];
+                }
+            }
+        }
+for (i=1;i<a-1;i++)
+    for(j=1;j<b-1;j++)
+        if((i<=bx)||(j<=by))
+{
+    u[i][j]=u1[i][j];
+    v[i][j]=v1[i][j];
+}
+//Eiler border condition
+for (int q=1;q<a-1;q++)//up
+{
+    u[q][0]=u[q][1];    v[q][0]=v[q][1];    en[q][0]=en[q][1];
+}
+for (int q=1;q<=bx;q++) //down, main
+{
+    u[q][b-1]=u[q][b-2];    v[q][b-1]=-v[q][b-2];    en[q][b-1]=en[q][b-2];
+}
+for (int q=bx+1;q<a-1;q++)//down, stair
+{
+    u[q][by+1]=u[q][by];    v[q][by+1]=-v[q][by];    en[q][by+1]=en[q][by];
+}
+for(int w=1;w<=by;w++)//right, main
+{
+    u[a-1][w]=u[a-2][w];    v[a-1][w]=v[a-2][w];    en[a-1][w]=en[a-2][w];
+}
+for(int w=by+1;w<b-1;w++)//right, stair
+{
+    u[bx+1][w]=-u[bx][w];    v[bx+1][w]=v[bx][w];    en[bx+1][w]=en[bx][w];
+}
+        //Lagranj+End step
+
+    for(i=1;i<a-1;i++)
+    {
+        for(j=1;j<b-1;j++)
+        {
+            if((i<=bx)||(j<=by))
+            ro1[i][j]=ro[i][j]-(half(one,u,i,j,i+1,j)-half(one,u,i-1,j,i,j))/dx*dt-(half(one,v,i,j,i,j+1)-half(one,v,i,j-1,i,j))/dy*dt;
+        }
+    }
+    for(i=1;i<a-1;i++)
+    {
+        for(j=1;j<b-1;j++)
+        {
+            if((i<=bx)||(j<=by))
+            {
+                u1[i][j]=(ro[i][j]*u[i][j]-(half(u,u,i,j,i+1,j)-half(u,u,i-1,j,i,j))/dx*dt-(half(u,v,i,j,i,j+1)-half(u,v,i,j-1,i,j))/dy*dt)/ro1[i][j];
+                v1[i][j]=(ro[i][j]*v[i][j]-(half(v,u,i,j,i+1,j)-half(v,u,i-1,j,i,j))/dx*dt-(half(v,v,i,j,i,j+1)-half(v,v,i,j-1,i,j))/dy*dt)/ro1[i][j];
+                en1[i][j]=(ro[i][j]*en[i][j]-(half(en,u,i,j,i+1,j)-half(en,u,i-1,j,i,j))/dx*dt-(half(en,v,i,j,i,j+1)-half(en,v,i,j-1,i,j))/dy*dt)/ro1[i][j];
+            }
+        }
+    }
+    for(i=1;i<a-1;i++)
+    {
+        for(j=1;j<b-1;j++)
+        {
+            if((i<=bx)||(j<=by))
+            {
+                u[i][j]=u1[i][j];
+                v[i][j]=v1[i][j];
+                en[i][j]=en1[i][j];
+                ro[i][j]=ro1[i][j];
+                pres[i][j]=0.4*ro[i][j]*(en[i][j]-0.5*(u[i][j]*u[i][j]+v[i][j]*v[i][j]));
+                temp[i][j]=pres[i][j]/ro[i][j];
+            }
+        }
+    }
+if(ch%100==0){
+        cout<<sh<<" ";
+        vivod(); }
+}
+return 0;
+}
